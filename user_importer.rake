@@ -6,7 +6,7 @@ namespace :user_importer do
     abort "Please specify the CSV file to import" if args[:csv_file].blank?
 
     CSV.foreach(args[:csv_file], col_sep: ';', headers: true) do |new_user|
-      user = User.where(email: new_user['email']).first
+      user = UserEmail.where(email: new_user['email']).first.user
       if user
         new_groups = new_user_groups(new_user['groups']) - user.groups.map(&:name)
         user.groups << parse_user_groups(new_groups)
@@ -16,7 +16,6 @@ namespace :user_importer do
       else
         u = User.new({
           username: new_user['username'] || UserNameSuggester.suggest(new_user['email']),
-          email: new_user['email'],
           password: SecureRandom.hex,
           name: new_user['name'],
           title: new_user['title'],
@@ -27,7 +26,7 @@ namespace :user_importer do
         u.import_mode = true
         u.groups = parse_user_groups new_user['groups']
         u.activate
-
+        user_email = UserEmail.create!(email: new_user['email'], user: u)
         if u.save
           puts "Imported #{u.name} (#{u.email}) as #{u.username} to #{u.groups.map(&:name).join(',')}"
         else
